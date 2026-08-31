@@ -1,0 +1,173 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE nta PUBLIC '-//Uppaal Team//DTD Flat System 1.6//EN' 'http://www.it.uu.se/research/group/darts/uppaal/flat-1_6.dtd'>
+<nta>
+	<declaration>// Abstracted Timed Automata Model with dedicated SafetyShield Template.
+// Coordinate shifted: Ego starts at 0m to prevent integer range faults.
+// Scaled units: 1 unit = 1 millimeter (1e-3 meters).
+// Time unit: 1 millisecond.
+
+const int SCALE = 1000;
+const int TOTAL_TIME = 20000;
+const int CONTROL_PERIOD = 1;
+
+// Scaled Constant Velocities (m/ms * SCALE)
+const int EgoSpeed_scaled = 14;    // ~50 km/h mapped to mm/ms
+const int OtherSpeed_scaled = 14;  // ~50 km/h mapped to mm/ms
+
+// Explicitly bounded large integer types to satisfy UPPAAL verification constraints
+typedef int[-2147483647, 2147483647] large_int;
+
+// Shifted interval boundaries for the Ego car (Initial X = 0)
+large_int x_pos_min = 0;
+large_int x_pos_max = 0;
+large_int y_pos_min = 1 * SCALE;
+large_int y_pos_max = 1 * SCALE;
+
+// Shifted Positions for surrounding cars (Relative to Ego Initial X = 300)
+large_int rear_x_scaled = -200 * SCALE;
+large_int slow_x_scaled = 300 * SCALE;
+
+// Dynamic Safety envelope parameters updated by the Shield template
+large_int front_shield_dist = 20 * SCALE;
+large_int rear_shield_dist = 15 * SCALE;
+
+// Track violation states explicitly
+bool shield_violation = false;
+
+// Over-approximated coordinate steps for each 1ms control interval (in mm)
+int x_step_low = 14;
+int x_step_high = 14;
+int y_step_low = 0;
+int y_step_high = 0;
+
+// Dynamic Heading tracking partitioned intervals
+int heading_zone = 0; // 0: Straight, 1: Shallow Left, 2: Steep Left
+
+clock Time;
+
+// Conservative interval lookup updating abstraction metrics
+void updateZoneRates()
+{
+    if (heading_zone == 0) {       
+        x_step_low  = 13;       
+        x_step_high = 14;       
+        y_step_low  = -1;        
+        y_step_high = 1;         
+    } else if (heading_zone == 1) { 
+        x_step_low  = 12;       
+        x_step_high = 14;       
+        y_step_low  = 1;         
+        y_step_high = 5;        
+    } else {                       
+        x_step_low  = 12;
+        x_step_high = 14;
+        y_step_low  = -5;
+        y_step_high = 5;
+    }
+}
+	</declaration>
+	<template>
+		<name x="5" y="5">Ego_Car</name>
+		<declaration>clock sample;
+		</declaration>
+		<location id="id0" x="-340" y="0">
+			<name x="-372" y="-34">Initialize</name>
+			<committed/>
+		</location>
+		<location id="id1" x="0" y="0">
+			<name x="25" y="-25">Driving</name>
+			<label kind="invariant" x="-119" y="25">Time &lt;= TOTAL_TIME &amp;&amp;
+sample &lt;= CONTROL_PERIOD</label>
+		</location>
+		<location id="id2" x="255" y="0">
+			<name x="229" y="-34">Finished</name>
+		</location>
+		<init ref="id0"/>
+		<transition id="id3">
+			<source ref="id0"/>
+			<target ref="id1"/>
+			<label kind="assignment" x="-255" y="-42">sample = 0,
+updateZoneRates()</label>
+		</transition>
+		<transition id="id4">
+			<source ref="id1"/>
+			<target ref="id1"/>
+			<label kind="guard" x="-136" y="-93">sample &gt;= CONTROL_PERIOD &amp;&amp; Time &lt; TOTAL_TIME</label>
+			<label kind="assignment" x="110" y="25">x_pos_min += x_step_low,
+x_pos_max += x_step_high,
+y_pos_min += y_step_low,
+y_pos_max += y_step_high,
+sample = 0,
+heading_zone = (Time &gt; 2000 &amp;&amp; Time &lt; 8000) ? 1 : ((Time &gt;= 8000 &amp;&amp; Time &lt; 14000) ? 2 : 0),
+updateZoneRates()</label>
+			<nail x="-68" y="-59"/>
+			<nail x="68" y="-59"/>
+		</transition>
+		<transition id="id5">
+			<source ref="id1"/>
+			<target ref="id2"/>
+			<label kind="guard" x="68" y="-42">Time &gt;= TOTAL_TIME</label>
+		</transition>
+	</template>
+	<template>
+		<name>SafetyShield</name>
+		<declaration>clock sample;
+		</declaration>
+		<location id="id6" x="-200" y="0">
+			<name x="-306" y="-17">Monitoring</name>
+			<label kind="invariant" x="-246" y="25">sample &lt;= CONTROL_PERIOD</label>
+		</location>
+		<init ref="id6"/>
+		<transition id="id7">
+			<source ref="id6"/>
+			<target ref="id6"/>
+			<label kind="guard" x="-297" y="-85">sample &gt;= CONTROL_PERIOD</label>
+			<label kind="assignment" x="-127" y="-59">front_shield_dist = 10 * SCALE,
+rear_shield_dist = 8 * SCALE,
+shield_violation = (x_pos_max &gt;= slow_x_scaled - front_shield_dist &amp;&amp; x_pos_min &lt;= slow_x_scaled),
+sample = 0</label>
+			<nail x="-246" y="-51"/>
+			<nail x="-153" y="-51"/>
+		</transition>
+	</template>
+	<template>
+		<name>Rear_Car</name>
+		<location id="id8" x="-200" y="0">
+			<name x="-280" y="-8">Driving</name>
+			<label kind="invariant" x="-210" y="15">Time &lt;= TOTAL_TIME</label>
+		</location>
+		<init ref="id8"/>
+		<transition id="id9">
+			<source ref="id8"/>
+			<target ref="id8"/>
+			<label kind="guard" x="-300" y="-93">Time &lt; TOTAL_TIME</label>
+			<label kind="assignment" x="-161" y="-42">rear_x_scaled += OtherSpeed_scaled</label>
+			<nail x="-246" y="-51"/>
+			<nail x="-153" y="-51"/>
+		</transition>
+	</template>
+	<template>
+		<name>Slow_Car</name>
+		<location id="id10" x="-200" y="0">
+			<name x="-280" y="-8">Driving</name>
+			<label kind="invariant" x="-210" y="15">Time &lt;= TOTAL_TIME</label>
+		</location>
+		<init ref="id10"/>
+		<transition id="id11">
+			<source ref="id10"/>
+			<target ref="id10"/>
+			<label kind="guard" x="-300" y="-93">Time &lt; TOTAL_TIME</label>
+			<label kind="assignment" x="-161" y="-34">slow_x_scaled += OtherSpeed_scaled</label>
+			<nail x="-246" y="-51"/>
+			<nail x="-153" y="-51"/>
+		</transition>
+	</template>
+	<system>system Ego_Car, SafetyShield, Rear_Car, Slow_Car;
+	</system>
+	<queries>
+		<query>
+			<formula>A[] not shield_violation</formula>
+			<comment>Exhaustive Verification: Checks that the independent SafetyShield state never encounters a perimeter violation constraint during full trace execution.</comment>
+		</query>
+	</queries>
+</nta>

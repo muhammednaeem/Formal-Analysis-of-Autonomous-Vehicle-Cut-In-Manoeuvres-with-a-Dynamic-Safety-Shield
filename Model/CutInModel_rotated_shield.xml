@@ -59,7 +59,7 @@ double steering = 0.0;
 
 
 // Time is in seconds in the shield-distance equations
-const double REACTION_TIME = 1.0;
+const double REACTION_TIME = 1000.0;
 
 // Minimum safety distances in meters
 const double BASE_FRONT_GAP = 10.0;
@@ -72,8 +72,8 @@ const double REAR_SHIELD = 15.0;
 const double LATERAL_SHIELD = 2.2;
 
 // Braking capabilities in m/s²
-const double EGO_BRAKE = 6.0;
-const double OTHER_BRAKE = 6.0;
+const double EGO_BRAKE = 0.000006;
+const double OTHER_BRAKE = 0.000006;
 
 //------- Variables to save data in text file------------
 meta double T, X_Ego, Y_Ego, X_rear, Y_rear, X_slow, Y_slow,S_front_left_x,  S_front_left_y, S_front_right_x, S_front_right_y, S_rear_right_x,  S_rear_right_y, S_rear_left_x,   S_rear_left_y;
